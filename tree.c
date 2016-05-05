@@ -41,6 +41,12 @@ void insert_symbol(symbol_node *p){
 //函数形参比较函数，调用形参相同返回1，否则返回0
 int cmp_args(arg_node* arg1,arg_node* arg2)
 {
+	if(arg1==NULL&&arg2==NULL)
+	return 1;
+	if(arg1==NULL)
+	return  0;
+	if(arg2==NULL)
+	return  0;
 	if(arg1->num!=arg2->num)
 	return 0;
 	else {
@@ -75,16 +81,28 @@ int cmp_types_struct(Type* t1,Type* t2)
 	FieldList* f2= t2->u.structure;
 	while(f1!=NULL ||f2!=NULL)
 	{
+		
 		if(f1==NULL &&f2!=NULL)
-		return 0;
-		if(f1!=NULL &&f1==NULL)
-		return 0;
+		{
+			
+			return 0;
+			}
+		if(f1!=NULL &&f2==NULL)
+		{
+			
+			return 0;
+			}
 		if(cmp_types(f1->type,f2->type)==0)
+		{
+		
 		return 0;
+		}
 		else 
 		{
+		
 			f1=f1->next;
 			f2=f2->next;
+			
 		}
 	}
 	return 1;
@@ -127,6 +145,7 @@ void redefined_field(Type* type)
 //深度遍历语法树，进行类型检查和维护符号表
 void DFS(struct TreeNode *root)
 {
+	
 	if(root->type==27)
 	{
 	//当前节点是Program，构造一个包含所有进行过函数声明的函数名称的链表，在最后对其中每一个名称进行处理，判断函数是否定义过
@@ -323,15 +342,22 @@ void DFS(struct TreeNode *root)
 				else {
 					root->children[3]->inh_type=1; //deflist 用于结构体域而不是函数作用域的标识
 					DFS(root->children[3]);
-					redefined_field(root->children[3]->syn_kind);
+					if(root->children[3]->syn_kind!=NULL)
+						redefined_field(root->children[3]->syn_kind);
 					struct_node=(symbol_node *)malloc(sizeof(symbol_node));
 					strcpy(struct_node->key,root->children[1]->children[0]->string_value);
 					struct_node->type=Struct;
 					struct_node->u.struct_val=*((struct_symbol *)malloc(sizeof(struct_symbol)));
-					
-					struct_node->u.struct_val.structure=root->children[3]->syn_kind;
+					if(root->children[3]->syn_kind==NULL)
+					{
+							struct_node->u.struct_val.structure=(Type*)malloc(sizeof(Type));
+							struct_node->u.struct_val.structure->kind=Structure;
+							struct_node->u.struct_val.structure->u.structure=NULL;
+					}
+					else	
+						struct_node->u.struct_val.structure=root->children[3]->syn_kind;
 					insert_symbol(struct_node);
-					root->syn_kind=root->children[3]->syn_kind;
+					root->syn_kind=struct_node->u.struct_val.structure;
 				}
 			}
 			
@@ -386,6 +412,7 @@ void DFS(struct TreeNode *root)
 		}
 		else if(root->children_number==0)
 		{
+			
 			root->syn_kind==NULL;
 		}
 	}
@@ -459,14 +486,17 @@ void DFS(struct TreeNode *root)
 				{
 					strcpy(root->children[2]->inh_func,root->children[0]->string_value);
 					DFS(root->children[2]);
+					
 					if(cmp_args(func_node->u.func_val.args,root->children[2]->arg)==1&&cmp_types(func_node->u.func_val.ret_type,root->inh_kind)==1)
 					{
 						func_node->u.func_val.lineno=root->children[0]->lineno;
 						func_node->u.func_val.is_defined=1;
 					}
 					else 
-						print_err(19,root->children[0]->lineno,"Inconsistent function declaration!");
-						
+						{print_err(19,root->children[0]->lineno,"Inconsistent function declaration!");
+						  func_node->u.func_val.lineno=root->children[0]->lineno;
+						func_node->u.func_val.is_defined=1;
+						}	
 				}
 				else{    // FunDec -> ID LP RP
 					if(func_node->u.func_val.args==NULL&&cmp_types(func_node->u.func_val.ret_type,root->inh_kind)==1)
@@ -475,7 +505,10 @@ void DFS(struct TreeNode *root)
 						func_node->u.func_val.is_defined=1;
 					}
 					else 
-						print_err(19,root->children[0]->lineno,"Inconsistent function declaration!");
+						{print_err(19,root->children[0]->lineno,"Inconsistent function declaration!");
+						func_node->u.func_val.lineno=root->children[0]->lineno;
+						func_node->u.func_val.is_defined=1;
+						}
 				}
 			}
 		}
@@ -675,6 +708,7 @@ void DFS(struct TreeNode *root)
 			root->children[i]->inh_kind=root->inh_kind;
 			root->children[i]->inh_type=root->inh_type;
 			DFS(root->children[i]);
+			
 		}
 		if(root->inh_type==0)  //函数作用域
 		{
@@ -748,8 +782,10 @@ void DFS(struct TreeNode *root)
 					print_err(5,root->children[0]->lineno,"Type mismatched for assignment!");
 			}
 		}
+		
 		root->syn_kind=root->children[0]->syn_kind;
 		strcpy(root->string_value,root->children[0]->string_value);
+		
 		
 	}
 	else if(root->type==46) // Exp 表达式
@@ -777,16 +813,28 @@ void DFS(struct TreeNode *root)
 			DFS(root->children[0]);
 			
 			DFS(root->children[2]);
-			if(root->children[0]->syn_kind->kind!=root->children[2]->syn_kind->kind&&root->children[0]->syn_kind->kind!=Error&&root->children[2]->syn_kind->kind!=Error)
-				print_err(5,root->children[0]->lineno,"Type mismatched for assignment!");
-			else {
-				struct TreeNode *current=root->children[0];
-				if(current->children_number==1&&current->children[0]->type==2);
-				else if(current->children_number==3 &&current->children[0]->type==46&&current->children[1]->type==14&&current->children[2]->type==2);
-				else if(current->children_number==4&&current->children[1]->type==18);
+			struct TreeNode *current=root->children[0];
+				if((current->children_number==1&&current->children[0]->type==2)||(current->children_number==3 &&current->children[0]->type==46&&current->children[1]->type==14&&current->children[2]->type==2)||(current->children_number==4&&current->children[1]->type==18))
+				{
+					if(root->children[0]->syn_kind->kind!=root->children[2]->syn_kind->kind&&root->children[0]->syn_kind->kind!=Error&&root->children[2]->syn_kind->kind!=Error)
+					{
+						print_err(5,root->children[0]->lineno,"Type mismatched for assignment!");
+					}
+					else if(root->children[0]->syn_kind->kind==Structure && cmp_types_struct(root->children[0]->syn_kind,root->children[2]->syn_kind)==0&&root->children[0]->syn_kind->kind!=Error&&root->children[2]->syn_kind->kind!=Error)
+					{
+						print_err(5,root->children[0]->lineno,"Type mismatched for assignment!");
+			
+					}
+					else if(root->children[0]->syn_kind->kind!=Structure && cmp_types(root->children[0]->syn_kind,root->children[2]->syn_kind)==0&&root->children[0]->syn_kind->kind!=Error&&root->children[2]->syn_kind->kind!=Error)
+					{
+						print_err(5,root->children[0]->lineno,"Type mismatched for assignment!");
+					}
+				}
 				else
 					print_err(6,root->children[0]->children[0]->lineno,"The left-hand side of an assignment must be a variable!");
-			}
+			
+			
+			
 		}
 
 
@@ -794,7 +842,7 @@ void DFS(struct TreeNode *root)
 		{
 
 			
-			if(root->children[1]->type==12 ||root->children[1]->type==13||root->children[1]->type==4)//exp and/or/relop exp
+			if(root->children[1]->type==12 ||root->children[1]->type==13)//exp and/or
 			{
 			
 				DFS(root->children[0]);
@@ -803,6 +851,37 @@ void DFS(struct TreeNode *root)
 				Type *new_type=(Type*)malloc(sizeof(Type));
 				new_type->kind=Int;
 				root->syn_kind=new_type;
+			}
+			else if(root->children[1]->type==4)
+			{
+				DFS(root->children[0]);
+				DFS(root->children[1]);
+				DFS(root->children[2]);
+				if(root->children[0]->syn_kind->kind==Error||root->children[2]->syn_kind->kind==Error)
+				{
+				
+				Type *new_type=(Type*)malloc(sizeof(Type));
+				new_type->kind=Error;
+				root->syn_kind=new_type;
+				}
+				else if(root->children[0]->syn_kind->kind!=root->children[2]->syn_kind->kind){
+					print_err(7,root->children[1]->lineno,"Type mismatched for operands!");
+					Type *new_type=(Type*)malloc(sizeof(Type));
+					new_type->kind=Error;
+					root->syn_kind=new_type;
+				}
+				else if(root->children[0]->syn_kind->kind!=Int && root->children[0]->syn_kind->kind!=Float)
+				{
+					print_err(7,root->children[1]->lineno,"Type mismatched for operands!");
+					Type *new_type=(Type*)malloc(sizeof(Type));
+					new_type->kind=Error;
+					root->syn_kind=new_type;
+				}
+				else {
+				Type *new_type=(Type*)malloc(sizeof(Type));
+				new_type->kind=Int;
+				root->syn_kind=new_type;
+				};
 			}
 			else if(root->children[1]->type==9||root->children[1]->type==10||root->children[1]->type==11||root->children[1]->type==8)    //exp plus/minus/star/div exp
 			{
@@ -820,6 +899,13 @@ void DFS(struct TreeNode *root)
 				root->syn_kind=new_type;
 				}
 				else if(root->children[0]->syn_kind->kind!=root->children[2]->syn_kind->kind){
+					print_err(7,root->children[1]->lineno,"Type mismatched for operands!");
+					Type *new_type=(Type*)malloc(sizeof(Type));
+					new_type->kind=Error;
+					root->syn_kind=new_type;
+				}
+				else if(root->children[0]->syn_kind->kind!=Int && root->children[0]->syn_kind->kind!=Float)
+				{
 					print_err(7,root->children[1]->lineno,"Type mismatched for operands!");
 					Type *new_type=(Type*)malloc(sizeof(Type));
 					new_type->kind=Error;
@@ -870,22 +956,42 @@ void DFS(struct TreeNode *root)
 			
 			symbol_node *func_node=get_symbol(root->children[0]->string_value);
 			if(func_node==NULL)
-				print_err(2,root->children[0]->lineno,"Undefined function!");
+				{
+					print_err(2,root->children[0]->lineno,"Undefined function!");
+					Type* new_type=(Type *)malloc(sizeof(Type));
+					new_type->kind=Error;
+					root->syn_kind=new_type;
+				}
+					
+				
 			else {
 				if(func_node->type!=Func)
-					print_err(11,root->children[0]->lineno,"This is not a function!");
+					{
+						print_err(11,root->children[0]->lineno,"This is not a function!");
+						Type* new_type=(Type *)malloc(sizeof(Type));
+						new_type->kind=Error;
+						root->syn_kind=new_type;
+					}
 				else{
 					root->syn_kind=func_node->u.func_val.ret_type;
 					
+					
 					if(root->children_number==4){
 						DFS(root->children[2]);
-						if(cmp_args(func_node->u.func_val.args,root->children[2]->arg)==0)
+						
+						if(root->children[2]->syn_kind!=NULL && root->children[2]->syn_kind->kind==Error)
+							;
+						else if(cmp_args(func_node->u.func_val.args,root->children[2]->arg)==0)
 							print_err(9,root->children[0]->lineno,"Function is not applicable for arguments!");
+							
 							
 					}
 					else {
-						if(func_node->u.func_val.args->num!=0)
+						
+						if(func_node->u.func_val.num!=0)
 							print_err(9,root->children[0]->lineno,"Function is not applicable for arguments!");
+						
+							
 				}
 				}
 		}
@@ -955,22 +1061,38 @@ void DFS(struct TreeNode *root)
 	{
 		if(root->children_number==1) // Args -> Exp 
 		{
+			
 			DFS(root->children[0]);
+			
+			if(root->children[0]->syn_kind->kind==Error)
+			root->syn_kind=root->children[0]->syn_kind;
+			else root->syn_kind=NULL;
 			arg_node* new_arg=(arg_node*)malloc(sizeof(arg_node));
 			new_arg->type=root->children[0]->syn_kind;
 			new_arg->num=1;
 			new_arg->next=NULL;
 			root->arg=new_arg;
+			
 		}
 		else  // Args -> Exp COMMA Args
 		{
+			
 			DFS(root->children[0]);
+			DFS(root->children[2]);
+			if((root->children[0]->syn_kind!=NULL &&root->children[0]->syn_kind->kind==Error) ||  (root->children[2]->syn_kind!=NULL&&root->children[2]->syn_kind->kind==Error))
+			{ 
+				Type * new_type=(Type*)malloc(sizeof(Type));
+				new_type->kind=Error;
+				root->syn_kind=new_type;
+			}
+			else root->syn_kind=NULL;
 			arg_node* new_arg=(arg_node*)malloc(sizeof(arg_node));
 			new_arg->type=root->children[0]->syn_kind;
-			DFS(root->children[2]);
+			
 			new_arg->next=root->children[2]->arg;
 			new_arg->num=1+root->children[2]->arg->num;
 			root->arg=new_arg;
+			
 		}
 	}
 	else {  //others
